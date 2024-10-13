@@ -94,7 +94,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// 사용자 등록
+// Register
+// 사용자 등록 -> Register.jsx
 app.post('/api/register', [
   body('name').isString().withMessage('Name must be a string'),
   body('age').isInt({ min: 1 }).withMessage('Age must be a positive integer'),
@@ -122,7 +123,8 @@ app.post('/api/register', [
   }
 });
 
-// 사용자 로그인
+// LoginForm
+// 사용자 로그인 -> LoginForm.jsx
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -144,7 +146,8 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 홈 데이터 가져오기
+// Home
+// 홈 데이터 가져오기 -> Home.jsx
 app.get('/api/home', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -169,7 +172,79 @@ app.get('/api/home', authenticateToken, async (req, res) => {
   }
 });
 
-// To-Do 항목 가져오기
+
+// Calendar
+// 이벤트 저장 -> Calendar.jsx
+app.post('/api/events', authenticateToken, (req, res) => {
+  const user_id = req.user.id;
+  const { title, description, start_date, end_date, all_day, color } = req.body;
+
+  const query = `
+      INSERT INTO calendar (user_id, title, description, start_date, end_date, all_day, color, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+
+  db.query(query, [user_id, title, description, start_date, end_date, all_day, color], (err, result) => {
+      if (err) return res.status(500).send('Error saving event');
+      res.status(201).send({ id: result.insertId });
+  });
+});
+
+// 이벤트 확인 -> Calendar.jsx
+app.get('/api/events', authenticateToken, (req, res) => {
+  const userId = req.user.id; // 로그인한 사용자의 ID
+
+  const query = `
+      SELECT * FROM calendar 
+      WHERE user_id = ?`; // 날짜 조건 제거
+
+  db.query(query, [userId], (err, results) => {
+      if (err) {
+          console.error('Database error:', err);
+          return res.status(500).send('Error fetching events');
+      }
+      res.send(results); // 결과 반환
+  });
+});
+
+// 이벤트 수정 -> Calendar.jsx
+app.put('/api/events/:id', authenticateToken, (req, res) => {
+  const { id } = req.params.id;
+  const { title, description, start_date, end_date, all_day, color } = req.body;
+
+  // 필수 필드 확인
+  if (!title || !start_date || !end_date) {
+    return res.status(400).send('Title, start_date, and end_date are required');
+  }
+
+  const query = `
+      UPDATE calendar
+      SET title = ?, description = ?, start_date = ?, end_date = ?, all_day = ?, color = ?
+      WHERE id = ?`;
+  
+  db.query(query, [title, description, start_date, end_date, all_day, color, id], (err) => {
+      if (err) {
+          console.error('Database error:', err);
+          return res.status(500).send('Error updating event');
+      }
+      res.send('Event updated');
+  });
+});
+
+// 이벤트 삭제 -> Calendar.jsx
+app.delete('/api/events/:id', authenticateToken, (req, res) => {
+  const id = req.params.id; // URL에서 이벤트 ID 가져오기
+  const userId = req.user.id; // 로그인한 사용자의 ID
+
+  const query = `DELETE FROM calendar WHERE id = ? AND user_id = ?`; // user_id도 조건에 추가
+
+  db.query(query, [id, userId], (err, result) => {
+    if (err) return res.status(500).send('Error deleting event');
+    if (result.affectedRows === 0) return res.status(404).send('Event not found or not authorized to delete');
+    res.send('Event deleted');
+  });
+});
+
+// To-Do 항목 가져오기 -> To Do.jsx
 app.get('/api/todos', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -183,7 +258,7 @@ app.get('/api/todos', authenticateToken, async (req, res) => {
   }
 });
 
-// 새로운 To-Do 항목 추가하기
+// 새로운 To-Do 항목 추가하기 -> To Do.jsx
 app.post('/api/todos', authenticateToken, async (req, res) => {
   const userId = req.user.id; 
   const { content } = req.body;
@@ -195,9 +270,8 @@ app.post('/api/todos', authenticateToken, async (req, res) => {
     // 새로 생성된 항목 반환
     const newTodo = {
       id: result.insertId, // 새로 생성된 ID
+      user_id: userId,
       content: content,
-      created_at: new Date(),
-      updated_at: new Date(),
     };
 
     res.status(201).json(newTodo); // 새로 추가된 항목 반환
@@ -207,26 +281,21 @@ app.post('/api/todos', authenticateToken, async (req, res) => {
   }
 });
 
-// 특정 To-Do 항목 삭제하기
+// 특정 To-Do 항목 삭제하기 -> To Do.jsx
 app.delete('/api/todos/:id', (req, res) => {
   const { id } = req.params; // URL에서 전달된 id 가져오기
-  console.log(id);
   db.query('DELETE FROM todos WHERE id = ?', [id], (error, results) => {
     if (error) {
       console.error('Error deleting todo:', error); 
       return res.status(500).json({ error: error.message });
     }
 
-    // 삭제된 행이 있는지 확인
-    if (results.affectedRows === 0) {
-      return res.status(404).json({ error: 'Todo item not found' }); // 삭제된 행이 없으면 404 응답
-    }
-
+    // 삭제 후 항상 성공 응답
     res.status(200).json({ message: 'Todo item deleted successfully' }); // 성공 시 응답
   });
 });
 
-// 정보 가져오기
+// 정보 가져오기 -> Friends.jsx
 app.get('/api/userInfo', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -244,7 +313,7 @@ app.get('/api/userInfo', authenticateToken, async (req, res) => {
   }
 });
 
-// 친구 목록 가져오기
+// 친구 목록 가져오기 -> Friends.jsx
 app.get('/api/friendsList', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -269,7 +338,7 @@ app.get('/api/friendsList', authenticateToken, async (req, res) => {
   }
 });
 
-// 채팅 기록 가져오기
+// 채팅 기록 가져오기 -> Friends.jsx
 app.get('/api/chatHistory/:chatRoomId', authenticateToken, async (req, res) => {
   const chatRoomId = req.params.chatRoomId;
 
@@ -283,7 +352,7 @@ app.get('/api/chatHistory/:chatRoomId', authenticateToken, async (req, res) => {
   }
 });
 
-// 메시지 저장 API
+// 메시지 저장 API -> Friends.jsx
 app.post('/api/saveMessage', authenticateToken, async (req, res) => {
   const { chat_id, sender_id, message } = req.body;
 
@@ -302,7 +371,7 @@ app.post('/api/saveMessage', authenticateToken, async (req, res) => {
   }
 });
 
-// 새로운 채팅 방 생성
+// 새로운 채팅 방 생성 -> Friends.jsx
 app.post('/api/chatRoom', authenticateToken, async (req, res) => {
   const { userIds } = req.body; // 채팅에 참여할 사용자 ID 배열
   const userId = req.user.id; // 현재 사용자 ID
@@ -330,7 +399,7 @@ app.post('/api/chatRoom', authenticateToken, async (req, res) => {
   }
 });
 
-// 채팅 방 조회 API
+// 채팅 방 조회 API -> Friends.jsx
 app.get('/api/chatRooms', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -355,7 +424,7 @@ app.get('/api/chatRooms', authenticateToken, async (req, res) => {
   }
 });
 
-// 그룹 조회
+// 그룹 조회 -> Group.jsx
 app.get('/api/groups', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -376,7 +445,7 @@ app.get('/api/groups', authenticateToken, async (req, res) => {
   }
 });
 
-// 그룹 생성 API
+// 그룹 생성 API -> Group.jsx
 app.post('/api/createGroup', authenticateToken, async (req, res) => {
   const userId = req.user.id;
   const { code, name } = req.body; // 클라이언트로부터 그룹 코드와 이름을 받음
@@ -400,7 +469,7 @@ app.post('/api/createGroup', authenticateToken, async (req, res) => {
   }
 });
 
-// 그룹 코드 중복 확인 API
+// 그룹 코드 중복 확인 API -> Group.jsx
 app.get('/api/checkGroupCode/:code', async (req, res) => {
   const groupCode = req.params.code;
 
@@ -418,5 +487,5 @@ app.get('/api/checkGroupCode/:code', async (req, res) => {
 // 서버 포트 설정
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log('Server is running on port ${PORT}');
+  console.log(`Server is running on port ${PORT}`);
 });
