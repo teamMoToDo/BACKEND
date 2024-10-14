@@ -172,10 +172,9 @@ app.get('/api/home', authenticateToken, async (req, res) => {
   }
 });
 
-
 // Calendar
 // 이벤트 저장 -> Calendar.jsx
-app.post('/api/events', authenticateToken, (req, res) => {
+app.post('/api/events', authenticateToken, async (req, res) => {
   const user_id = req.user.id;
   const { title, description, start_date, end_date, all_day, color } = req.body;
 
@@ -183,10 +182,13 @@ app.post('/api/events', authenticateToken, (req, res) => {
       INSERT INTO calendar (user_id, title, description, start_date, end_date, all_day, color, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
 
-  db.query(query, [user_id, title, description, start_date, end_date, all_day, color], (err, result) => {
-      if (err) return res.status(500).send('Error saving event');
-      res.status(201).send({ id: result.insertId });
-  });
+  const [calendarEvents] = await db.query(query, [user_id, title, description, start_date, end_date, all_day, color]);
+
+  if(!calendarEvents){
+    console.log("undefined");
+  }
+
+  return res.json({ saveEventId: calendarEvents });
 });
 
 // 이벤트 확인 -> Calendar.jsx
@@ -243,6 +245,98 @@ app.delete('/api/events/:id', authenticateToken, (req, res) => {
     res.send('Event deleted');
   });
 });
+
+// Sticky
+// Sticky 노트 데이터 가져오기
+app.get('/api/stickys', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+
+    try {
+        const [stickyResults] = await db.query('SELECT * FROM sticky WHERE user_id = ?', [userId]);
+
+        res.json({
+            sticky: stickyResults,
+        });
+    } catch (error) {
+        console.error('Error fetching sticky notes:', error);
+        res.status(500).json({ error: 'Error fetching sticky notes', details: error.message });
+    }
+});
+
+// Sticky 노트 생성
+app.post('/api/stickys', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { content, color, position_x, position_y, width, height } = req.body;
+
+  try {
+      // SQL 쿼리에서 8개의 열에 대해 8개의 값을 정확하게 전달
+      const sql = `INSERT INTO sticky (user_id, content, color, position_x, position_y, width, height, created_at, updated_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+      const [result] = await db.query(sql, [userId, content, color, position_x, position_y, width, height]);
+      
+      // 성공 시 추가된 Sticky 노트의 정보를 반환
+      res.status(201).json({ 
+          id: result.insertId, 
+          content, 
+          color, 
+          position_x, 
+          position_y, 
+          width, 
+          height 
+      });
+  } catch (error) {
+      console.error('Error creating sticky note:', error);
+      res.status(500).json({ error: 'Failed to create sticky note', details: error.message });
+  }
+});
+
+// Sticky 노트 수정
+app.put('/api/stickys/:id', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { content, color, position_x, position_y, width, height } = req.body;
+
+    if (!content) {
+        return res.status(400).json({ error: 'Content is required' });
+    }
+
+    try {
+        const sql = `UPDATE sticky 
+                     SET content = ?, color = ?, position_x = ?, position_y = ?, width = ?, height = ?, updated_at = NOW() 
+                     WHERE id = ? AND user_id = ?`;
+        const [result] = await db.query(sql, [content, color, position_x, position_y, width, height, id, userId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Sticky note not found or not authorized to update' });
+        }
+
+        res.json({ message: 'Sticky note updated successfully' });
+    } catch (error) {
+        console.error('Error updating sticky note:', error);
+        res.status(500).json({ error: 'Failed to update sticky note', details: error.message });
+    }
+});
+
+// Sticky 노트 삭제
+app.delete('/api/stickys/:id', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { id } = req.params;
+
+    try {
+        const sql = `DELETE FROM sticky WHERE id = ? AND user_id = ?`;
+        const [result] = await db.query(sql, [id, userId]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Sticky note not found or not authorized to delete' });
+        }
+
+        res.json({ message: 'Sticky note deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting sticky note:', error);
+        res.status(500).json({ error: 'Failed to delete sticky note', details: error.message });
+    }
+});
+
 
 // To-Do 항목 가져오기 -> To Do.jsx
 app.get('/api/todos', authenticateToken, async (req, res) => {
