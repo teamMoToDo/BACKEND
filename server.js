@@ -254,9 +254,7 @@ app.get('/api/stickys', authenticateToken, async (req, res) => {
     try {
         const [stickyResults] = await db.query('SELECT * FROM sticky WHERE user_id = ?', [userId]);
 
-        res.json({
-            sticky: stickyResults,
-        });
+        res.json({ sticky: stickyResults });
     } catch (error) {
         console.error('Error fetching sticky notes:', error);
         res.status(500).json({ error: 'Error fetching sticky notes', details: error.message });
@@ -266,24 +264,16 @@ app.get('/api/stickys', authenticateToken, async (req, res) => {
 // Sticky 노트 생성
 app.post('/api/stickys', authenticateToken, async (req, res) => {
   const userId = req.user.id;
-  const { content, color, position_x, position_y, width, height } = req.body;
+  const { content, position_x, position_y, width, height } = req.body;
 
   try {
       // SQL 쿼리에서 8개의 열에 대해 8개의 값을 정확하게 전달
-      const sql = `INSERT INTO sticky (user_id, content, color, position_x, position_y, width, height, created_at, updated_at) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
-      const [result] = await db.query(sql, [userId, content, color, position_x, position_y, width, height]);
+      const sql = `INSERT INTO sticky (user_id, content, position_x, position_y, width, height, created_at, updated_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+      const [stickyResults] = await db.query(sql, [userId, content, position_x, position_y, width, height]);
       
       // 성공 시 추가된 Sticky 노트의 정보를 반환
-      res.status(201).json({ 
-          id: result.insertId, 
-          content, 
-          color, 
-          position_x, 
-          position_y, 
-          width, 
-          height 
-      });
+      res.status(201).json({ sticky: stickyResults });
   } catch (error) {
       console.error('Error creating sticky note:', error);
       res.status(500).json({ error: 'Failed to create sticky note', details: error.message });
@@ -293,18 +283,14 @@ app.post('/api/stickys', authenticateToken, async (req, res) => {
 // Sticky 노트 수정
 app.put('/api/stickys/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
-    const { id } = req.params;
-    const { content, color, position_x, position_y, width, height } = req.body;
-
-    if (!content) {
-        return res.status(400).json({ error: 'Content is required' });
-    }
+    const id = req.params.id;
+    const { content, position_x, position_y, width, height } = req.body;
 
     try {
         const sql = `UPDATE sticky 
-                     SET content = ?, color = ?, position_x = ?, position_y = ?, width = ?, height = ?, updated_at = NOW() 
+                     SET content = ?, position_x = ?, position_y = ?, width = ?, height = ?, updated_at = NOW() 
                      WHERE id = ? AND user_id = ?`;
-        const [result] = await db.query(sql, [content, color, position_x, position_y, width, height, id, userId]);
+        const [result] = await db.query(sql, [content, position_x, position_y, width, height, id, userId]);
         
         if (result.affectedRows === 0) {
             return res.status(404).json({ error: 'Sticky note not found or not authorized to update' });
@@ -320,7 +306,7 @@ app.put('/api/stickys/:id', authenticateToken, async (req, res) => {
 // Sticky 노트 삭제
 app.delete('/api/stickys/:id', authenticateToken, async (req, res) => {
     const userId = req.user.id;
-    const { id } = req.params;
+    const id = req.params.id;
 
     try {
         const sql = `DELETE FROM sticky WHERE id = ? AND user_id = ?`;
