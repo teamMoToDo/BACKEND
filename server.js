@@ -190,13 +190,13 @@ app.get('/api/events', authenticateToken, async (req, res) => {
 // 이벤트 저장 -> Calendar.jsx
 app.post('/api/events', authenticateToken, async (req, res) => {
   const user_id = req.user.id;
-  const { title, description, start_date, end_date, all_day, color } = req.body;
+  const { title, description, start_date, end_date, all_day, color, calendar_icon } = req.body;
 
   const query = `
-      INSERT INTO calendar (user_id, title, description, start_date, end_date, all_day, color, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+      INSERT INTO calendar (user_id, title, description, start_date, end_date, all_day, color, created_at, updated_at, calendar_icon)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)`;
 
-  const [calendarEvents] = await db.query(query, [user_id, title, description, start_date, end_date, all_day, color]);
+  const [calendarEvents] = await db.query(query, [user_id, title, description, start_date, end_date, all_day, color, calendar_icon]);
 
   if(!calendarEvents){
     console.log("undefined");
@@ -208,9 +208,9 @@ app.post('/api/events', authenticateToken, async (req, res) => {
 // 이벤트 수정 -> Calendar.jsx
 app.put('/api/events/:id', authenticateToken, async (req, res) => {
   const { id } = req.params.id;
-  const { title, description, start_date, end_date, all_day, color } = req.body;
+  const { title, description, start_date, end_date, all_day, color, calendar_icon } = req.body;
 
-  console.log(title, description, start_date, end_date, all_day, color);
+  console.log(title, description, start_date, end_date, all_day, color, calendar_icon);
 
   // 필수 필드 확인
   if (!title || !start_date || !end_date) {
@@ -219,12 +219,12 @@ app.put('/api/events/:id', authenticateToken, async (req, res) => {
 
   const query = `
       UPDATE calendar
-      SET title = ?, description = ?, start_date = ?, end_date = ?, all_day = ?, color = ?
+      SET title = ?, description = ?, start_date = ?, end_date = ?, all_day = ?, color = ?, calendar_icon =?
       WHERE id = ?`;
 
   try {
-    const sql = 'UPDATE calendar SET title = ?, description = ?, start_date = ?, end_date = ?, all_day =? , color = ? WHERE id = ?';
-    const [results] = await db.query(sql, [title, description, start_date, end_date, all_day, color, id]);
+    const sql = 'UPDATE calendar SET title = ?, description = ?, start_date = ?, end_date = ?, all_day =? , color = ?, calendar_icon = ? WHERE id = ?';
+    const [results] = await db.query(sql, [title, description, start_date, end_date, all_day, color, calendar_icon, id]);
 
     res.status(201).json({updateEvent: results});
   } catch(error) {
