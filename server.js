@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
@@ -6,20 +7,24 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const http = require('http');
 const socketIo = require('socket.io');
-require('dotenv').config(); // 환경 변수 설정
 
 const app = express();
 const server = http.createServer(app);
+
+const cors_origin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+
+console.log(cors_origin);
+
 const io = socketIo(server, {
   cors: {
-    origin: 'https://web-modoto-frontend-lyzuq35q9d13710b.sel4.cloudtype.app',
+    origin: cors_origin,
     credentials: true,
   },
 });
 
 app.use(express.json());
 app.use(cors({
-  origin: 'https://web-modoto-frontend-lyzuq35q9d13710b.sel4.cloudtype.app',
+  origin: cors_origin,
   credentials: true,
 }));
 
