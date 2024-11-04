@@ -432,7 +432,7 @@ app.get('/api/userInfo', authenticateToken, async (req, res) => {
 });
 
 // 친구 목록 가져오기 -> Friends.jsx
-app.get('/api/friendsList', authenticateToken, async (req, res) => {
+/*app.get('/api/friendsList', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
   try {
@@ -454,11 +454,50 @@ app.get('/api/friendsList', authenticateToken, async (req, res) => {
     console.error('Error fetching friends:', error);
     res.status(500).json({ error: 'Error fetching friends', details: error.message });
   }
+});*/
+
+// 친구 목록 가져오기 -> Friends.jsx
+app.get('/api/friendsList', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    // 사용자가 속한 모든 group_id 조회
+    const [groupResults] = await db.query('SELECT group_id FROM group_members WHERE user_id = ?', [userId]);
+
+    if (groupResults.length > 0) {
+      // 모든 그룹의 ID를 추출
+      const groupIds = groupResults.map(group => group.group_id);
+      
+      // 각 그룹의 멤버를 조회하기 위한 쿼리 (본인 제외)
+      const placeholders = groupIds.map(() => '?').join(', ');
+      const memberResults = await db.query(
+        `SELECT user_id FROM group_members WHERE group_id IN (${placeholders}) AND user_id != ?`, 
+        [...groupIds, userId] // 마지막에 userId를 추가하여 본인 제외
+      );
+      
+      const memberIds = memberResults[0].map(member => member.user_id);
+      
+      if (memberIds.length > 0) {
+        // 멤버 정보 조회를 위한 쿼리
+        const memberInfoPlaceholders = memberIds.map(() => '?').join(', ');
+        const memberInfoSql = `SELECT * FROM users WHERE id IN (${memberInfoPlaceholders})`;
+        const [memberInfoResults] = await db.query(memberInfoSql, memberIds);
+        
+        return res.status(200).json({ friends: memberInfoResults });
+      }
+    }
+
+    res.status(200).json({ friends: [] });
+  } catch (error) {
+    console.error('Error fetching friends:', error);
+    res.status(500).json({ error: 'Error fetching friends', details: error.message });
+  }
 });
 
+
 // 채팅 기록 가져오기 -> Friends.jsx
-app.get('/api/chatHistory/:chatRoomId', authenticateToken, async (req, res) => {
-  const chatRoomId = req.params.chatRoomId;
+/*app.get('/api/chatHistory/:reciverId', authenticateToken, async (req, res) => {
+  const chatRoomId = req.params.senderId;
 
   try {
     const sql = 'SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC';
@@ -468,17 +507,38 @@ app.get('/api/chatHistory/:chatRoomId', authenticateToken, async (req, res) => {
     console.error('Error fetching chat history:', error);
     res.status(500).json({ error: 'Error fetching chat history', details: error.message });
   }
+});*/
+
+app.get('/api/chatHistory/:receiverId', authenticateToken, async (req, res) => {
+  const senderId = req.user.id; // 접속한 유저의 ID
+  const receiverId = req.params.receiverId;
+
+  try {
+    const sql = `
+      SELECT * FROM messages 
+      WHERE 
+        (sender_id = ? AND receiver_id = ?) 
+        OR (sender_id = ? AND receiver_id = ?)
+      ORDER BY created_at ASC
+    `;
+    const [messages] = await db.query(sql, [senderId, receiverId, receiverId, senderId]);
+    
+    res.status(200).json({ messages });
+  } catch (error) {
+    console.error('Error fetching chat history:', error);
+    res.status(500).json({ error: 'Error fetching chat history', details: error.message });
+  }
 });
 
 // 메시지 저장 API -> Friends.jsx
 app.post('/api/saveMessage', authenticateToken, async (req, res) => {
-  const { chat_id, sender_id, message } = req.body;
+  const { sender_id, reciver_id, message } = req.body;
 
   // SQL 쿼리 작성
-  const sql = 'INSERT INTO messages (chat_id, sender_id, message, created_at) VALUES (?, ?, ?, NOW())';
+  const sql = 'INSERT INTO messages (sender_id, receiver_id, message, created_at) VALUES (?, ?, ?, NOW())';
   
   try {
-      const [result] = await db.query(sql, [chat_id, sender_id, message]); // 값을 SQL 쿼리에 전달
+      const [result] = await db.query(sql, [sender_id, reciver_id, message]); // 값을 SQL 쿼리에 전달
       // 성공적으로 메시지가 저장된 경우
       res.status(201).json({ message: '메시지가 저장되었습니다.' });
   } catch (error) {
@@ -488,7 +548,7 @@ app.post('/api/saveMessage', authenticateToken, async (req, res) => {
 });
 
 // 새로운 채팅 방 생성 -> Friends.jsx
-app.post('/api/chatRoom', authenticateToken, async (req, res) => {
+/*app.post('/api/chatRoom', authenticateToken, async (req, res) => {
   const { userIds } = req.body; 
   const userId = req.user.id; 
 
@@ -509,11 +569,42 @@ app.post('/api/chatRoom', authenticateToken, async (req, res) => {
     console.error('Error creating chat room:', error);
     res.status(500).json({ error: 'Error creating chat room', details: error.message });
   }
+}); */
+
+// 새로운 채팅 방 생성 -> Friends.jsx
+app.post('/api/chatRoom', authenticateToken, async (req, res) => {
+  const { userIds } = req.body;
+  const userId = req.user.id;
+  const friendId = userIds[0];
+
+  try {
+      // 기존에 대화가 있는지 확인
+      const checkSql = `
+          SELECT id FROM chats 
+          WHERE (user_id = ? AND friend_id = ?) 
+             OR (user_id = ? AND friend_id = ?)
+      `;
+      const [existingChat] = await db.query(checkSql, [userId, friendId, friendId, userId]);
+
+      if (existingChat.length > 0) {
+          return res.status(200).json({ chatRoomId: existingChat[0].id });
+      }
+
+      // 새로운 채팅 방 생성
+      const sql = 'INSERT INTO chats (user_id, friend_id, created_at) VALUES (?, ?, NOW())';
+      const [result] = await db.query(sql, [userId, friendId]);
+      res.status(201).json({ chatRoomId: result.insertId });
+  } catch (error) {
+      console.error('Error creating chat room:', error);
+      res.status(500).json({ error: 'Error creating chat room', details: error.message });
+  }
 });
 
+
 // 채팅 방 조회 API -> Friends.jsx
-app.get('/api/chatRooms', authenticateToken, async (req, res) => {
+app.get('/api/chatRooms/:freindId', authenticateToken, async (req, res) => {
   const userId = req.user.id;
+  const receiverId = req.params.freindId;
 
   try {
       // 사용자가 참여하고 있는 모든 채팅 방 조회
@@ -527,7 +618,7 @@ app.get('/api/chatRooms', authenticateToken, async (req, res) => {
           WHERE c.user_id = ? OR c.friend_id = ?
           ORDER BY c.created_at DESC
       `;
-      const [chatRooms] = await db.query(sql, [userId, userId, userId]);
+      const [chatRooms] = await db.query(sql, [userId, userId, receiverId]);
 
       res.json({ chatRooms });
   } catch (error) {
