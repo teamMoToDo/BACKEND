@@ -334,7 +334,6 @@ app.delete('/api/stickys/:id', authenticateToken, async (req, res) => {
     }
 });
 
-
 // To-Do 항목 가져오기 -> To Do.jsx
 app.get('/api/todos', authenticateToken, async (req, res) => {
   const userId = req.user.id;
@@ -432,31 +431,6 @@ app.get('/api/userInfo', authenticateToken, async (req, res) => {
 });
 
 // 친구 목록 가져오기 -> Friends.jsx
-/*app.get('/api/friendsList', authenticateToken, async (req, res) => {
-  const userId = req.user.id;
-
-  try {
-    // 친구 ID 조회
-    const [friendResults] = await db.query('SELECT friend_id FROM friends WHERE user_id = ?', [userId]);
-    const friendIds = friendResults.map(friend => friend.friend_id);
-
-    if (friendIds.length > 0) {
-      // 친구 정보 조회를 위한 쿼리
-      const placeholders = friendIds.map(() => '?').join(', ');
-      const friendInfoSql = `SELECT * FROM users WHERE id IN (${placeholders})`; // 백틱 사용
-      const [friendInfoResults] = await db.query(friendInfoSql, friendIds);
-      
-      return res.json({ friends: friendInfoResults });
-    }
-
-    res.json({ friends: [] });
-  } catch (error) {
-    console.error('Error fetching friends:', error);
-    res.status(500).json({ error: 'Error fetching friends', details: error.message });
-  }
-});*/
-
-// 친구 목록 가져오기 -> Friends.jsx
 app.get('/api/friendsList', authenticateToken, async (req, res) => {
   const userId = req.user.id;
 
@@ -494,21 +468,6 @@ app.get('/api/friendsList', authenticateToken, async (req, res) => {
   }
 });
 
-
-// 채팅 기록 가져오기 -> Friends.jsx
-/*app.get('/api/chatHistory/:reciverId', authenticateToken, async (req, res) => {
-  const chatRoomId = req.params.senderId;
-
-  try {
-    const sql = 'SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC';
-    const [messages] = await db.query(sql, [chatRoomId]);
-    res.json({ messages });
-  } catch (error) {
-    console.error('Error fetching chat history:', error);
-    res.status(500).json({ error: 'Error fetching chat history', details: error.message });
-  }
-});*/
-
 app.get('/api/chatHistory/:receiverId', authenticateToken, async (req, res) => {
   const senderId = req.user.id; // 접속한 유저의 ID
   const receiverId = req.params.receiverId;
@@ -532,13 +491,13 @@ app.get('/api/chatHistory/:receiverId', authenticateToken, async (req, res) => {
 
 // 메시지 저장 API -> Friends.jsx
 app.post('/api/saveMessage', authenticateToken, async (req, res) => {
-  const { sender_id, reciver_id, message } = req.body;
+  const { sender_id, receiver_id, message } = req.body;
 
   // SQL 쿼리 작성
   const sql = 'INSERT INTO messages (sender_id, receiver_id, message, created_at) VALUES (?, ?, ?, NOW())';
   
   try {
-      const [result] = await db.query(sql, [sender_id, reciver_id, message]); // 값을 SQL 쿼리에 전달
+      const [result] = await db.query(sql, [sender_id, receiver_id, message]); // 값을 SQL 쿼리에 전달
       // 성공적으로 메시지가 저장된 경우
       res.status(201).json({ message: '메시지가 저장되었습니다.' });
   } catch (error) {
@@ -546,30 +505,6 @@ app.post('/api/saveMessage', authenticateToken, async (req, res) => {
       res.status(500).json({ error: '메시지 저장 실패', details: error.message });
   }
 });
-
-// 새로운 채팅 방 생성 -> Friends.jsx
-/*app.post('/api/chatRoom', authenticateToken, async (req, res) => {
-  const { userIds } = req.body; 
-  const userId = req.user.id; 
-
-  try {
-    const sql = 'INSERT INTO chats (user_id, friend_id, created_at) VALUES (?, ?, NOW())';
-    const friendId = userIds[0]; 
-    const [result] = await db.query(sql, [userId, friendId]); 
-    const chatRoomId = result.insertId;
-
-    const friendInsertPromises = userIds.map(friendId => {
-      return db.query('INSERT INTO chats (user_id, friend_id, created_at) VALUES (?, ?, NOW())', [chatRoomId, friendId]);
-    });
-
-    await Promise.all(friendInsertPromises);
-
-    res.status(201).json({ chatRoomId });
-  } catch (error) {
-    console.error('Error creating chat room:', error);
-    res.status(500).json({ error: 'Error creating chat room', details: error.message });
-  }
-}); */
 
 // 새로운 채팅 방 생성 -> Friends.jsx
 app.post('/api/chatRoom', authenticateToken, async (req, res) => {
@@ -883,6 +818,29 @@ app.patch('/api/notice/:noticeId', authenticateToken, async (req, res) => {
     res.status(200).json({ message: 'Notice item updated successfully'});
   } catch (error) {
     res.status(500).json({ error : 'Failed to patching Notice items' });
+  }
+});
+
+// Quotes 가져오기
+app.get('/api/quotes', authenticateToken, async (req, res) => {
+  const randomNumber = req.query.randomNumber;
+
+  try {
+      const sql = 'SELECT content FROM quotes WHERE id = ?';
+      const [results] = await db.query(sql, [randomNumber]); // 결과를 results로 변경
+
+      console.log(results); // 결과 확인
+
+      if (results.length > 0) {
+          // 결과가 존재하는 경우에만 content 반환
+          res.status(200).json({ content: results[0].content });
+      } else {
+          // 결과가 없는 경우 처리
+          res.status(404).json({ message: 'Quote not found' });
+      }
+  } catch (error) {
+      console.error(error); // 에러 로깅
+      res.status(500).json({ message: 'Error fetching quotes' });
   }
 });
 
