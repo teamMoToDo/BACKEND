@@ -211,7 +211,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
 
 // 이벤트 수정 -> Calendar.jsx
 app.put('/api/events/:id', authenticateToken, async (req, res) => {
-  const { id } = req.params.id;
+  const { id } = req.params;  // id 추출 방식 수정
   const { title, description, start_date, end_date, all_day, color } = req.body;
 
   // 필수 필드 확인
@@ -220,15 +220,16 @@ app.put('/api/events/:id', authenticateToken, async (req, res) => {
   }
 
   try {
-    const sql = 'UPDATE calendar SET title = ?, description = ?, start_date = ?, end_date = ?, all_day =? , color = ?, WHERE id = ?';
+    const sql = 'UPDATE calendar SET title = ?, description = ?, start_date = ?, end_date = ?, all_day = ?, color = ? WHERE id = ?';  // 쉼표 오류 수정
     const [results] = await db.query(sql, [title, description, start_date, end_date, all_day, color, id]);
 
-    res.status(201).json({updateEvent: results});
-  } catch(error) {
+    res.status(200).json({ updateEvent: results });  // 상태 코드 수정
+  } catch (error) {
     console.error('Database error:', error);
     return res.status(500).send('Error updating event');
   }
 });
+
 
 // 이벤트 삭제 -> Calendar.jsx
 app.delete('/api/events/:id', authenticateToken, async (req, res) => {
