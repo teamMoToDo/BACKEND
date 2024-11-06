@@ -13,8 +13,6 @@ const server = http.createServer(app);
 
 const cors_origin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
-console.log(cors_origin);
-
 const io = socketIo(server, {
   cors: {
     origin: cors_origin,
@@ -26,6 +24,7 @@ app.use(express.json());
 app.use(cors({
   origin: cors_origin,
   credentials: true,
+
 }));
 
 // 데이터베이스 설정을 환경 변수로 관리
@@ -195,13 +194,13 @@ app.get('/api/events', authenticateToken, async (req, res) => {
 // 이벤트 저장 -> Calendar.jsx
 app.post('/api/events', authenticateToken, async (req, res) => {
   const user_id = req.user.id;
-  const { title, description, start_date, end_date, all_day, color, calendar_icon } = req.body;
+  const { title, description, start_date, end_date, all_day, color } = req.body;
 
   const query = `
-      INSERT INTO calendar (user_id, title, description, start_date, end_date, all_day, color, created_at, updated_at, calendar_icon)
+      INSERT INTO calendar (user_id, title, description, start_date, end_date, all_day, color, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)`;
 
-  const [calendarEvents] = await db.query(query, [user_id, title, description, start_date, end_date, all_day, color, calendar_icon]);
+  const [calendarEvents] = await db.query(query, [user_id, title, description, start_date, end_date, all_day, color]);
 
   if(!calendarEvents){
     console.log("undefined");
@@ -213,23 +212,16 @@ app.post('/api/events', authenticateToken, async (req, res) => {
 // 이벤트 수정 -> Calendar.jsx
 app.put('/api/events/:id', authenticateToken, async (req, res) => {
   const { id } = req.params.id;
-  const { title, description, start_date, end_date, all_day, color, calendar_icon } = req.body;
-
-  console.log(title, description, start_date, end_date, all_day, color, calendar_icon);
+  const { title, description, start_date, end_date, all_day, color } = req.body;
 
   // 필수 필드 확인
   if (!title || !start_date || !end_date) {
     return res.status(400).send('Title, start_date, and end_date are required');
   }
 
-  const query = `
-      UPDATE calendar
-      SET title = ?, description = ?, start_date = ?, end_date = ?, all_day = ?, color = ?, calendar_icon =?
-      WHERE id = ?`;
-
   try {
-    const sql = 'UPDATE calendar SET title = ?, description = ?, start_date = ?, end_date = ?, all_day =? , color = ?, calendar_icon = ? WHERE id = ?';
-    const [results] = await db.query(sql, [title, description, start_date, end_date, all_day, color, calendar_icon, id]);
+    const sql = 'UPDATE calendar SET title = ?, description = ?, start_date = ?, end_date = ?, all_day =? , color = ?, WHERE id = ?';
+    const [results] = await db.query(sql, [title, description, start_date, end_date, all_day, color, id]);
 
     res.status(201).json({updateEvent: results});
   } catch(error) {
@@ -829,8 +821,6 @@ app.get('/api/quotes', authenticateToken, async (req, res) => {
       const sql = 'SELECT content FROM quotes WHERE id = ?';
       const [results] = await db.query(sql, [randomNumber]); // 결과를 results로 변경
 
-      console.log(results); // 결과 확인
-
       if (results.length > 0) {
           // 결과가 존재하는 경우에만 content 반환
           res.status(200).json({ content: results[0].content });
@@ -841,6 +831,69 @@ app.get('/api/quotes', authenticateToken, async (req, res) => {
   } catch (error) {
       console.error(error); // 에러 로깅
       res.status(500).json({ message: 'Error fetching quotes' });
+  }
+});
+
+// Calendar Icon 가져오기
+app.get('/api/calendarIcon', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    const sql = 'SELECT * FROM calendar_icon WHERE id = ?';
+    const [results] = await db.query(sql, [userId]);
+
+    res.status(200).json({ calendar_icon: results });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching calendar_icon' });
+  }
+});
+
+// Calendar Icon 추가
+app.post('/api/calendarIcon', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { iconNumber, iconDate } = req.body;
+
+  try {
+    const sql = 'INSERT INTO calendar_icon (user_id, icon_number, icon_date) VALUES(?, ?, ?)';
+    const [results] = await db.query(sql, [userId, iconNumber, iconDate]);
+
+    if(!results)
+      res.status(500).json({ error: 'Failed insert Calendar Icon'});
+
+    res.status(200).json({ message: 'Success Insert Calendar Icon'});
+  } catch(error) {
+    res.status(500).json({ error: 'Error Failed insert Calendar Icon'});
+  }
+});
+
+// Calendar Icon 변경
+app.patch('/api/calendarIcon/:iconId', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { iconId } = req.params;
+  const { iconNumber } = req.body;
+
+  try {
+    const sql = 'UPDATE calendar_icon SET icon_number = ? WHERE id = ? AND user_id = ?';
+    await db.query(sql, [iconNumber, iconId, userId]);
+
+    res.status(200).json({ message: 'Success patch calednar icon'});
+  } catch (error) {
+    res.status(500).json({ message: 'Failed patch calendar icon'});
+  }
+});
+
+// Calendar Icon 삭제
+app.delete('/api/calendarIcon/:iconId', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const { iconId } = req.params;
+
+  try {
+    const sql = 'DELETE FROM calendar_icon WHERE id = ? AND user_id = ?';
+    await db.query(sql, [iconId, userId]);
+
+    res.status(200).json({ message: 'Delete calendar_icon' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed Delete calendar_icon'});
   }
 });
 
