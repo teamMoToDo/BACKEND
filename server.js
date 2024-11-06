@@ -198,7 +198,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
 
   const query = `
       INSERT INTO calendar (user_id, title, description, start_date, end_date, all_day, color, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), ?)`;
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW() )`;
 
   const [calendarEvents] = await db.query(query, [user_id, title, description, start_date, end_date, all_day, color]);
 
@@ -225,7 +225,7 @@ app.put('/api/events/:id', authenticateToken, async (req, res) => {
 
     res.status(201).json({updateEvent: results});
   } catch(error) {
-    console.error('Database error:', err);
+    console.error('Database error:', error);
     return res.status(500).send('Error updating event');
   }
 });
