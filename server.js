@@ -757,6 +757,7 @@ app.get('/api/notice', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch Notice items' });
   }
 });
+//테스트코드
 
 // Notice 항목 추가하기
 app.post('/api/notice', authenticateToken, async (req,res) => {
