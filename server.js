@@ -677,8 +677,8 @@ app.get('/api/groupTodos', authenticateToken, async (req, res) => {
   const groupId = req.query.groupId;
 
   try {
-    const sql = 'SELECT id, group_id, user_id, content, completed FROM group_todos WHERE group_id =? AND user_id = ?';
-    const [results] = await db.query(sql, [groupId, userId]);
+    const sql = 'SELECT id, group_id, user_id, content, completed FROM group_todos WHERE group_id =?';
+    const [results] = await db.query(sql, [groupId]);
 
     res.status(201).json({ gTodo: results });
   } catch (error){
@@ -732,8 +732,8 @@ app.patch('/api/groupTodos/:id', authenticateToken, async (req, res) => {
   const { completed } = req.body;
 
   try {
-    const sql = 'UPDATE group_todos SET completed = ? WHERE id = ? AND user_id = ? ';
-    await db.query(sql, [completed, id, userId]);
+    const sql = 'UPDATE group_todos SET completed = ? WHERE id = ?';
+    await db.query(sql, [completed, id]);
 
     res.status(200).json({ message: 'Group Todo item chekced update successfully' });
   } catch (error) {
@@ -749,8 +749,8 @@ app.get('/api/notice', authenticateToken, async (req, res) => {
   const groupId = req.query.groupId;
 
   try {
-    const sql = 'SELECT id, title, content, author FROM notice WHERE user_id = ? AND group_id = ?';
-    const [results] = await db.query(sql, [userId, groupId]);
+    const sql = 'SELECT id, title, content, author FROM notice WHERE group_id = ?';
+    const [results] = await db.query(sql, [groupId]);
 
     res.status(201).json({ notices: results });
   } catch (error) {
